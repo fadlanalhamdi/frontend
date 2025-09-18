@@ -1,10 +1,30 @@
+// Nama File: page.js (UI Diperbaiki, Backend Tetap Sama)
 "use client";
 
 import { useState, useRef, useEffect } from "react";
 
+// Komponen kecil untuk animasi loading (...)
+const LoadingDots = () => (
+  <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+    <span style={{ width: '8px', height: '8px', background: '#9ca3af', borderRadius: '50%', animation: 'bounce 1.4s infinite ease-in-out both', animationDelay: '0s' }}></span>
+    <span style={{ width: '8px', height: '8px', background: '#9ca3af', borderRadius: '50%', animation: 'bounce 1.4s infinite ease-in-out both', animationDelay: '0.15s' }}></span>
+    <span style={{ width: '8px', height: '8px', background: '#9ca3af', borderRadius: '50%', animation: 'bounce 1.4s infinite ease-in-out both', animationDelay: '0.3s' }}></span>
+    <style jsx global>{`
+      @keyframes bounce {
+        0%, 80%, 100% { transform: scale(0); }
+        40% { transform: scale(1.0); }
+      }
+    `}</style>
+  </div>
+);
+
+
 export default function ChatDashboard() {
   const [question, setQuestion] = useState("");
-  const [chatHistory, setChatHistory] = useState([]);
+  const [messages, setMessages] = useState([]); 
+  // --- STATE DIUBAH ---
+  // Kita tidak lagi menggunakan isLoading global, tapi isResponding untuk menonaktifkan input
+  const [isResponding, setIsResponding] = useState(false);
   const [activeUser, setActiveUser] = useState("Superman");
   const chatEndRef = useRef(null);
 
@@ -14,31 +34,59 @@ export default function ChatDashboard() {
     { name: "Black Widow", preview: "Can I talk to agent?", email: "blackwidow@gmail.com", phone: "(980) 765-4321", avatar: "🕷️" }
   ];
 
+  // --- FUNGSI HANDLEASK DIUBAH TOTAL ---
   const handleAsk = async () => {
-    if (!question.trim()) return;
+    if (!question.trim() || isResponding) return;
+
+    const userMessage = { id: Date.now(), text: question, isUser: true };
+    // Ini adalah "Pesan Placeholder" untuk jawaban bot
+    const botMessagePlaceholder = { id: Date.now() + 1, text: "", isUser: false };
+    
+    // Langsung tampilkan pesan user dan placeholder bot yang kosong
+    setMessages(prev => [...prev, userMessage, botMessagePlaceholder]);
+    const currentQuestion = question; // Simpan pertanyaan saat ini
+    setQuestion("");
+    setIsResponding(true);
 
     try {
-      const res = await fetch("/api/ask", {
+      // Backend tetap sama, tidak perlu diubah.
+      const res = await fetch("http://127.0.0.1:8000/ask", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query: question }),
+        body: JSON.stringify({ query: currentQuestion }),
       });
 
-      if (!res.ok) throw new Error("Request gagal");
+      if (!res.ok) throw new Error("Request gagal ke backend");
 
       const data = await res.json();
-      setChatHistory([...chatHistory, { question, answer: data.answer }]);
-      setQuestion("");
+
+      // Cari placeholder di state dan isi dengan jawaban dari backend
+      setMessages(prev =>
+        prev.map(msg =>
+          msg.id === botMessagePlaceholder.id
+            ? { ...msg, text: data.answer || "Server tidak memberikan jawaban." }
+            : msg
+        )
+      );
+
     } catch (err) {
       console.error(err);
-      setChatHistory([...chatHistory, { question, answer: "⚠️ Terjadi error saat request." }]);
-      setQuestion("");
+      // Jika error, isi placeholder dengan pesan error
+      setMessages(prev =>
+        prev.map(msg =>
+          msg.id === botMessagePlaceholder.id
+            ? { ...msg, text: "⚠️ Gagal terhubung ke server backend." }
+            : msg
+        )
+      );
+    } finally {
+      setIsResponding(false);
     }
   };
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [chatHistory]);
+  }, [messages]);
 
   const theme = {
     background: "linear-gradient(135deg, #0f2027, #203a43, #2c5364)",
@@ -58,7 +106,7 @@ export default function ChatDashboard() {
       background: theme.background,
       color: theme.text
     }}>
-      {/* Sidebar Left */}
+      {/* Sidebar Left (Tidak diubah) */}
       <div style={{
         width: "260px",
         backdropFilter: "blur(8px)",
@@ -113,14 +161,14 @@ export default function ChatDashboard() {
         ))}
       </div>
 
-      {/* Chat Window */}
+      {/* Chat Window (Ada perubahan kecil di bagian render pesan) */}
       <div style={{
         flex: 1,
         display: "flex",
         flexDirection: "column",
         borderRight: `1px solid ${theme.border}`
       }}>
-        {/* Header */}
+        {/* Header (Tidak diubah) */}
         <div style={{
           padding: "16px",
           borderBottom: `1px solid ${theme.border}`,
@@ -155,37 +203,36 @@ export default function ChatDashboard() {
           flexDirection: "column",
           gap: "14px"
         }}>
-          {chatHistory.map((chat, index) => (
-            <div key={index} style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-              <div style={{
-                alignSelf: "flex-end",
-                background: theme.bubbleUser,
+          {messages.map((msg, index) => (
+            <div
+              key={msg.id || index}
+              style={{
+                alignSelf: msg.isUser ? "flex-end" : "flex-start",
+                background: msg.isUser ? theme.bubbleUser : theme.bubbleBot,
                 padding: "12px 16px",
-                borderRadius: "18px 18px 4px 18px",
+                borderRadius: msg.isUser ? "18px 18px 4px 18px" : "18px 18px 18px 4px",
                 maxWidth: "70%",
                 wordWrap: "break-word",
-                color: "#fff",
-                boxShadow: "0 2px 6px rgba(0,0,0,0.2)"
-              }}>
-                {chat.question}
-              </div>
-              <div style={{
-                alignSelf: "flex-start",
-                background: theme.bubbleBot,
-                padding: "12px 16px",
-                borderRadius: "18px 18px 18px 4px",
-                maxWidth: "70%",
-                wordWrap: "break-word",
-                boxShadow: "0 2px 6px rgba(0,0,0,0.2)"
-              }}>
-                {chat.answer}
-              </div>
+                color: msg.isUser ? "#fff" : theme.text,
+                boxShadow: "0 2px 6px rgba(0,0,0,0.2)",
+                minHeight: '40px',
+                display: 'flex',
+                alignItems: 'center'
+              }}
+            >
+              {/* --- LOGIKA RENDER PESAN DIUBAH --- */}
+              {/* Jika pesan dari bot DAN teksnya kosong, tampilkan animasi loading */}
+              {!msg.isUser && msg.text === "" ? (
+                <LoadingDots />
+              ) : (
+                <p style={{ whiteSpace: 'pre-wrap', margin: 0 }}>{msg.text}</p>
+              )}
             </div>
           ))}
           <div ref={chatEndRef} />
         </div>
 
-        {/* Input */}
+        {/* Input (Ada perubahan kecil) */}
         <div style={{
           padding: "16px",
           display: "flex",
@@ -208,28 +255,28 @@ export default function ChatDashboard() {
               outline: "none"
             }}
             onKeyDown={(e) => e.key === "Enter" && handleAsk()}
+            disabled={isResponding}
           />
           <button
             onClick={handleAsk}
             style={{
               padding: "12px 18px",
               borderRadius: "50%",
-              background: theme.accent,
+              background: isResponding ? "#555" : theme.accent,
               color: "#fff",
               border: "none",
-              cursor: "pointer",
+              cursor: isResponding ? "not-allowed" : "pointer",
               fontSize: "16px",
               transition: "0.3s"
             }}
-            onMouseEnter={(e) => e.currentTarget.style.transform = "scale(1.1)"}
-            onMouseLeave={(e) => e.currentTarget.style.transform = "scale(1)"}
+            disabled={isResponding}
           >
-            ➤
+            {isResponding ? "..." : "➤"}
           </button>
         </div>
       </div>
 
-      {/* Sidebar Right */}
+      {/* Sidebar Right (Tidak diubah) */}
       <div style={{
         width: "260px",
         backdropFilter: "blur(8px)",
