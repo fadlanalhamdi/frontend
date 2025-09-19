@@ -50,7 +50,7 @@ export default function ChatDashboard() {
 
     try {
       // Backend tetap sama, tidak perlu diubah.
-      const res = await fetch("https://Goodplay99-Smartbot.hf.space/chat_bot", {
+      const res = await fetch("https://Goodplay99-Smartbot.hf.space/Smartbot", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ query: currentQuestion }),
